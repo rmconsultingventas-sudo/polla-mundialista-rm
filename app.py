@@ -69,6 +69,19 @@ st.markdown(f"""
         padding-bottom: 0.5rem !important;
     }}
 
+
+/* --- HACER VISIBLE EL BOTÓN DE MENÚ EN CELULARES --- */
+    header[data-testid="stHeader"] button {
+        background-color: rgba(30, 41, 59, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        border-radius: 8px !important;
+        margin: 5px !important;
+    }
+    header[data-testid="stHeader"] svg {
+        fill: #ffffff !important;
+        stroke: #ffffff !important;
+    }
+
     /* --- MENÚ LATERAL (SIDEBAR) 70% TRANSPARENTE --- */
     [data-testid="stSidebar"] {{
         background-color: rgba(30, 41, 59, 0.3) !important;
