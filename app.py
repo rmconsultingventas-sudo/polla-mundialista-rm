@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import time
 import base64
 import os
+import streamlit.components.v1 as components
 
 # --- CONFIGURACIÓN DE GIDs Y CORREO ---
 SENDER_EMAIL = "rm.consulting.ventas@gmail.com"
@@ -36,15 +37,15 @@ def obtener_base64_imagen(nombre_archivo):
             data = f.read()
         return base64.b64encode(data).decode()
     except Exception as e:
-        print(f"Error cargando imagen: {e}")
         return ""
 
 img_base64 = obtener_base64_imagen("fondo.jpeg")
 
 # --- DISEÑO FUTBOLERO Y FONDO DE PANTALLA (CSS) ---
+# Nota: Dobles llaves {{}} para evitar SyntaxError en f-strings
 st.markdown(f"""
     <style>
-    /* 1. Imagen de fondo global con filtro oscuro polarizado */
+    /* 1. Imagen de fondo global */
     .stApp {{
         background-image: linear-gradient(rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.85)), url("data:image/jpeg;base64,{img_base64}");
         background-size: cover;
@@ -52,7 +53,6 @@ st.markdown(f"""
         background-attachment: fixed;
     }}
     
-    /* 2. Forzar que el texto principal sea blanco para contraste */
     .stApp, h1, h2, h3, p, label, .stMarkdown {{
         color: #ffffff !important;
     }}
@@ -62,18 +62,21 @@ st.markdown(f"""
         background-color: transparent !important;
     }}
     .block-container {{
-        padding-top: 3rem !important; 
+        padding-top: 1.5rem !important; 
         padding-bottom: 2rem !important;
+    }}
+    h1 {{
+        margin-top: 0 !important;
     }}
 
     /* --- MENÚ LATERAL (SIDEBAR) 70% TRANSPARENTE --- */
-    [data-testid="stSidebar"] {
-        background-color: rgba(30, 41, 59, 0.3) !important; /* 0.3 = 30% color, 70% transparente */
-        backdrop-filter: none !important; /* Quitamos el desenfoque para ver la imagen nítida */
+    [data-testid="stSidebar"] {{
+        background-color: rgba(30, 41, 59, 0.3) !important;
+        backdrop-filter: none !important; 
         border-right: 1px solid rgba(255, 255, 255, 0.2);
     }}
 
-    /* 3. Efecto Cristal Oscuro para las pestañas y formularios */
+    /* 3. Efecto Cristal Oscuro para pestañas y formularios */
     [data-testid="stForm"], .stTabs [data-baseweb="tab-panel"] {{
         background-color: rgba(30, 41, 59, 0.7) !important;
         border-radius: 15px;
@@ -143,7 +146,6 @@ def parse_fecha(fecha_str):
     try: return datetime.strptime(str(fecha_str).strip(), "%d/%m/%Y %H:%M")
     except: return datetime.now() + timedelta(days=365)
 
-# --- LÓGICA DINÁMICA DE BANDERAS ---
 def obtener_bandera(equipo, df_banderas, es_local=True):
     equipo_limpio = str(equipo).strip().lower()
     if not df_banderas.empty and 'equipo' in df_banderas.columns and 'bandera' in df_banderas.columns:
@@ -192,9 +194,7 @@ if st.session_state.paso == 'inicio':
             else: st.error("Cédula no registrada en el sistema.")
 
 elif st.session_state.paso == 'verificar':
-    # Mensaje de advertencia para revisar el correo
-    st.info("📩 **¡Código enviado!** Por favor, revisa tu correo electrónico para obtener tu PIN de seguridad de 6 dígitos. Si no lo ves en tu bandeja principal, **verifica la carpeta de Spam o Correo no deseado**.")
-    
+    st.info("📩 **¡Código enviado!** Por favor, revisa tu correo electrónico para obtener tu PIN de acceso de 6 dígitos. Si no lo ves en tu bandeja principal, **verifica la carpeta de Spam o Correo no deseado**.")
     cod = st.text_input("Ingresa el código de 6 dígitos", type="password")
     if st.button("Entrar"):
         if cod == st.session_state.token_verif:
@@ -230,19 +230,61 @@ elif st.session_state.paso == 'apostador':
 
     nombres_rondas_display = " + ".join(rondas_activas) if len(rondas_activas) <= 2 else f"Múltiples Fases ({len(rondas_activas)})"
 
-    if f_apertura <= ahora <= f_cierre:
-        diff = f_cierre - ahora
-        d, h, m = diff.days, diff.seconds // 3600, (diff.seconds // 60) % 60
-        st.warning(f"⏳ Faltan {d} días, {h} horas, {m} minutos para el cierre.")
-        st.caption(f"Fecha límite para modificar: {f_cierre.strftime('%d/%m/%Y %H:%M')}")
+    # --- RELOJ EN TIEMPO REAL (JAVASCRIPT) ---
+    col_timer, col_deadline = st.columns([1.5, 1])
 
-    # --- INSTRUCTIVO DE NAVEGACIÓN (ACORDEÓN DESPLEGABLE) ---
+    with col_timer:
+        if f_apertura <= ahora <= f_cierre:
+            cierre_iso = f_cierre.strftime("%Y-%m-%dT%H:%M:%S")
+            reloj_html = f"""
+            <style>
+                body {{ margin: 0; padding: 0; font-family: sans-serif; background-color: transparent; }}
+                .timer-box {{
+                    background-color: rgba(255, 193, 7, 0.15);
+                    color: #ffc107;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    border: 1px solid rgba(255, 193, 7, 0.5);
+                    font-size: 15px;
+                    font-weight: bold;
+                    display: inline-block;
+                }}
+            </style>
+            <div class="timer-box" id="clock">⏳ Calculando tiempo...</div>
+            <script>
+                var countDownDate = new Date("{cierre_iso}").getTime();
+                var x = setInterval(function() {{
+                    var now = new Date().getTime();
+                    var distance = countDownDate - now;
+                    if (distance < 0) {{
+                        clearInterval(x);
+                        document.getElementById("clock").innerHTML = "🔒 APUESTAS CERRADAS";
+                    }} else {{
+                        var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                        var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                        hours = (hours < 10) ? "0" + hours : hours;
+                        minutes = (minutes < 10) ? "0" + minutes : minutes;
+                        seconds = (seconds < 10) ? "0" + seconds : seconds;
+                        document.getElementById("clock").innerHTML = "⏳ Faltan " + days + "d " + hours + ":" + minutes + ":" + seconds;
+                    }}
+                }}, 1000);
+            </script>
+            """
+            components.html(reloj_html, height=45)
+            
+    with col_deadline:
+        if f_apertura <= ahora <= f_cierre:
+            st.caption(f"Fecha límite: {f_cierre.strftime('%d/%m/%Y %H:%M')}")
+
+    # --- INSTRUCTIVO DE NAVEGACIÓN ---
     with st.expander("📖 ¿Cómo funciona la plataforma? ¡Lee este breve instructivo!"):
         st.markdown("""
         Bienvenido a la Polla Mundialista. Navega usando las pestañas de abajo:
         * **📝 Mis Pronósticos:** Aquí verás los partidos activos. Ingresa los goles, marca la casilla de confirmación al final y presiona "Guardar". ¡Puedes modificar tus resultados antes de la fecha de cierre!
         * **🥇 Mi Podio:** Elige qué países quedarán como Campeón, Subcampeón y Tercer lugar.
-        * **📊 Ranking:** Revisa tu posición en tiempo real frente a los demás participantes. Los puntos se calculan automáticamente según los resultados reales.
+        * **📊 Ranking:** Revisa tu posición en tiempo real frente a los demás participantes.
         * **❓ Ayuda:** Consulta el reglamento oficial del juego y el manual de usuario detallado.
         """)
 
@@ -329,7 +371,6 @@ elif st.session_state.paso == 'apostador':
                     if not disabled_input:
                         respuestas[pid] = (eq_a, eq_b, ga, gb)
                 
-                # --- POKA-YOKE: DOBLE CONFIRMACIÓN ---
                 st.info(f"💡 Recuerda que puedes modificar tus valores hasta el **{f_cierre.strftime('%d/%m/%Y %H:%M')}**. Los partidos en blanco se guardarán como 0 - 0.")
                 confirmacion = st.checkbox("Confirmo que deseo guardar estos marcadores en la base de datos.")
                 
@@ -368,7 +409,7 @@ elif st.session_state.paso == 'apostador':
                                     texto_estado.empty()
                                     barra_carga.progress(100)
                                     st.balloons()
-                                    st.success("¡Marcadores guardados exitosamente! Ya has guardado tus pronósticos para los partidos activos. ¡Mucha suerte!")
+                                    st.success("¡Marcadores guardados exitosamente!")
                                     time.sleep(3)
                                     st.cache_data.clear()
                                     st.rerun()
@@ -405,7 +446,7 @@ elif st.session_state.paso == 'apostador':
                             st.cache_data.clear(); st.rerun()
                 else: st.warning("Selección de podio deshabilitada por límite de tiempo.")
 
-# --- PESTAÑA 3: RANKING ---
+    # --- PESTAÑA 3: RANKING ---
     with tab3:
         st.subheader("🏆 Ranking General")
         df_ap = all_data['apuestas'].copy()
@@ -474,24 +515,20 @@ elif st.session_state.paso == 'apostador':
             df_mostrar = df_rank_base.head(limite_r).copy()
             ced_activa = str(user['cedula']).strip()
 
-            # --- NUEVO: LÓGICA DE VISIBILIDAD DEL USUARIO FUERA DEL TOP ---
             if ced_activa not in df_mostrar['cedula'].astype(str).values:
                 user_row = df_rank_base[df_rank_base['cedula'].astype(str) == ced_activa]
                 if not user_row.empty:
-                    # Fila fantasma para crear el efecto visual
                     dummy_row = pd.DataFrame([{
                         "Pos": None,
                         "Empleado": "... ⬇️ ...",
                         "Pts Totales": "... ⬇️ ...",
-                        "1er Criterio": "... ⬇️ ...",
-                        "2do Criterio": "... ⬇️ ...",
-                        "3er Criterio": pd.NaT, # Valor nulo para fechas
+                        "1er Criterio": "...",
+                        "2do Criterio": "...",
+                        "3er Criterio": "...", 
                         "cedula": "separador"
                     }])
-                    # Unimos la tabla top, el separador y la fila del usuario
                     df_mostrar = pd.concat([df_mostrar, dummy_row, user_row], ignore_index=True)
 
-            # 1. Renombrar las columnas con la descripción completa
             df_para_mostrar = df_mostrar.rename(columns={
                 "Pos": "𝐏𝐎𝐒",
                 "Empleado": "𝐄𝐌𝐏𝐋𝐄𝐀𝐃𝐎",
@@ -502,7 +539,6 @@ elif st.session_state.paso == 'apostador':
                 "cedula": "cedula"
             })
 
-            # --- LÓGICA DE PRIVACIDAD ESTRICTA (Sin filtros de cédula) ---
             indices_usuario = df_para_mostrar.index[df_para_mostrar['cedula'].astype(str) == ced_activa].tolist()
             df_publico = df_para_mostrar.drop(columns=['cedula'])
 
