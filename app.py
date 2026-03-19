@@ -57,6 +57,22 @@ st.markdown(f"""
         color: #ffffff !important;
     }}
 
+    /* --- TRANSPARENCIA SUPERIOR Y ESPACIO --- */
+    header[data-testid="stHeader"] {{
+        background-color: transparent !important;
+    }}
+    .block-container {{
+        padding-top: 3rem !important; 
+        padding-bottom: 2rem !important;
+    }}
+
+    /* --- MENÚ LATERAL (SIDEBAR) CON CRISTAL OSCURO --- */
+    [data-testid="stSidebar"] {{
+        background-color: rgba(30, 41, 59, 0.6) !important;
+        backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }}
+
     /* 3. Efecto Cristal Oscuro para las pestañas y formularios */
     [data-testid="stForm"], .stTabs [data-baseweb="tab-panel"] {{
         background-color: rgba(30, 41, 59, 0.7) !important;
@@ -176,6 +192,9 @@ if st.session_state.paso == 'inicio':
             else: st.error("Cédula no registrada en el sistema.")
 
 elif st.session_state.paso == 'verificar':
+    # Mensaje de advertencia para revisar el correo
+    st.info("📩 **¡Código enviado!** Por favor, revisa tu correo electrónico para obtener tu PIN de seguridad de 6 dígitos. Si no lo ves en tu bandeja principal, **verifica la carpeta de Spam o Correo no deseado**.")
+    
     cod = st.text_input("Ingresa el código de 6 dígitos", type="password")
     if st.button("Entrar"):
         if cod == st.session_state.token_verif:
@@ -216,6 +235,16 @@ elif st.session_state.paso == 'apostador':
         d, h, m = diff.days, diff.seconds // 3600, (diff.seconds // 60) % 60
         st.warning(f"⏳ Faltan {d} días, {h} horas, {m} minutos para el cierre.")
         st.caption(f"Fecha límite para modificar: {f_cierre.strftime('%d/%m/%Y %H:%M')}")
+
+    # --- INSTRUCTIVO DE NAVEGACIÓN (ACORDEÓN DESPLEGABLE) ---
+    with st.expander("📖 ¿Cómo funciona la plataforma? ¡Lee este breve instructivo!"):
+        st.markdown("""
+        Bienvenido a la Polla Mundialista. Navega usando las pestañas de abajo:
+        * **📝 Mis Pronósticos:** Aquí verás los partidos activos. Ingresa los goles, marca la casilla de confirmación al final y presiona "Guardar". ¡Puedes modificar tus resultados antes de la fecha de cierre!
+        * **🥇 Mi Podio:** Elige qué países quedarán como Campeón, Subcampeón y Tercer lugar.
+        * **📊 Ranking:** Revisa tu posición en tiempo real frente a los demás participantes. Los puntos se calculan automáticamente según los resultados reales.
+        * **❓ Ayuda:** Consulta el reglamento oficial del juego y el manual de usuario detallado.
+        """)
 
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Mis Pronósticos", "🥇 Mi Podio", "📊 Ranking", "❓ Ayuda"])
 
@@ -444,7 +473,6 @@ elif st.session_state.paso == 'apostador':
 
             df_mostrar = df_rank_base.head(limite_r).copy()
 
-            # 1. Renombrar las columnas con la descripción completa
             df_para_mostrar = df_mostrar.rename(columns={
                 "Pos": "𝐏𝐎𝐒",
                 "Empleado": "𝐄𝐌𝐏𝐋𝐄𝐀𝐃𝐎",
@@ -457,19 +485,22 @@ elif st.session_state.paso == 'apostador':
 
             ced_activa = str(user['cedula']).strip()
 
-            # 2. Función de estilo que resalta al usuario activo y centra TODOS los datos
-            def estilo_usuario(row):
-                if str(row['cedula']) == ced_activa: 
-                    return ['background-color: #198754; color: white; text-align: center'] * len(row)
-                return ['text-align: center'] * len(row)
+            # --- LÓGICA DE PRIVACIDAD ESTRICTA (Sin filtros de cédula) ---
+            indices_usuario = df_para_mostrar.index[df_para_mostrar['cedula'].astype(str) == ced_activa].tolist()
+            df_publico = df_para_mostrar.drop(columns=['cedula'])
 
-            # 3. Dibujar la tabla con tooltips de ayuda
+            def estilo_usuario_seguro(x):
+                df_estilos = pd.DataFrame('text-align: center', index=x.index, columns=x.columns)
+                for idx in indices_usuario:
+                    if idx in df_estilos.index:
+                        df_estilos.loc[idx, :] = 'background-color: #198754; color: white; text-align: center'
+                return df_estilos
+
             st.dataframe(
-                df_para_mostrar.style.apply(estilo_usuario, axis=1),
+                df_publico.style.apply(estilo_usuario_seguro, axis=None),
                 hide_index=True,
                 use_container_width=True,
                 column_config={
-                    "cedula": None,
                     "𝟏𝐄𝐑 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐄𝐗𝐀𝐂𝐓𝐎𝐒": st.column_config.NumberColumn(help="Marcadores exactos acertados (+5 Pts)"),
                     "𝟐𝐃𝐎 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐓𝐄𝐍𝐃𝐄𝐍𝐂𝐈𝐀": st.column_config.NumberColumn(help="Tendencias de ganador acertadas (+3 Pts)"),
                     "Ú𝐋𝐓. 𝐀𝐏𝐔𝐄𝐒𝐓𝐀": st.column_config.DatetimeColumn(help="Fecha y hora de desempate", format="DD/MM/YYYY HH:mm:ss")
