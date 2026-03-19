@@ -405,7 +405,7 @@ elif st.session_state.paso == 'apostador':
                             st.cache_data.clear(); st.rerun()
                 else: st.warning("Selección de podio deshabilitada por límite de tiempo.")
 
-    # --- PESTAÑA 3: RANKING ---
+# --- PESTAÑA 3: RANKING ---
     with tab3:
         st.subheader("🏆 Ranking General")
         df_ap = all_data['apuestas'].copy()
@@ -472,7 +472,26 @@ elif st.session_state.paso == 'apostador':
                 if val != "" and val != "nan": limite_r = int(float(val))
 
             df_mostrar = df_rank_base.head(limite_r).copy()
+            ced_activa = str(user['cedula']).strip()
 
+            # --- NUEVO: LÓGICA DE VISIBILIDAD DEL USUARIO FUERA DEL TOP ---
+            if ced_activa not in df_mostrar['cedula'].astype(str).values:
+                user_row = df_rank_base[df_rank_base['cedula'].astype(str) == ced_activa]
+                if not user_row.empty:
+                    # Fila fantasma para crear el efecto visual
+                    dummy_row = pd.DataFrame([{
+                        "Pos": None,
+                        "Empleado": "⬇️ ... ⬇️",
+                        "Pts Totales": None,
+                        "1er Criterio": None,
+                        "2do Criterio": None,
+                        "3er Criterio": pd.NaT, # Valor nulo para fechas
+                        "cedula": "separador"
+                    }])
+                    # Unimos la tabla top, el separador y la fila del usuario
+                    df_mostrar = pd.concat([df_mostrar, dummy_row, user_row], ignore_index=True)
+
+            # 1. Renombrar las columnas con la descripción completa
             df_para_mostrar = df_mostrar.rename(columns={
                 "Pos": "𝐏𝐎𝐒",
                 "Empleado": "𝐄𝐌𝐏𝐋𝐄𝐀𝐃𝐎",
@@ -482,8 +501,6 @@ elif st.session_state.paso == 'apostador':
                 "3er Criterio": "Ú𝐋𝐓. 𝐀𝐏𝐔𝐄𝐒𝐓𝐀",
                 "cedula": "cedula"
             })
-
-            ced_activa = str(user['cedula']).strip()
 
             # --- LÓGICA DE PRIVACIDAD ESTRICTA (Sin filtros de cédula) ---
             indices_usuario = df_para_mostrar.index[df_para_mostrar['cedula'].astype(str) == ced_activa].tolist()
