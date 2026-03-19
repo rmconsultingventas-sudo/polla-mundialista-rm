@@ -66,11 +66,11 @@ st.markdown(f"""
         padding-bottom: 2rem !important;
     }}
 
-    /* --- MENÚ LATERAL (SIDEBAR) CON CRISTAL OSCURO --- */
-    [data-testid="stSidebar"] {{
-        background-color: rgba(30, 41, 59, 0.6) !important;
-        backdrop-filter: blur(10px);
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    /* --- MENÚ LATERAL (SIDEBAR) 70% TRANSPARENTE --- */
+    [data-testid="stSidebar"] {
+        background-color: rgba(30, 41, 59, 0.3) !important; /* 0.3 = 30% color, 70% transparente */
+        backdrop-filter: none !important; /* Quitamos el desenfoque para ver la imagen nítida */
+        border-right: 1px solid rgba(255, 255, 255, 0.2);
     }}
 
     /* 3. Efecto Cristal Oscuro para las pestañas y formularios */
@@ -481,10 +481,10 @@ elif st.session_state.paso == 'apostador':
                     # Fila fantasma para crear el efecto visual
                     dummy_row = pd.DataFrame([{
                         "Pos": None,
-                        "Empleado": "⬇️ ... ⬇️",
-                        "Pts Totales": None,
-                        "1er Criterio": None,
-                        "2do Criterio": None,
+                        "Empleado": "... ⬇️ ...",
+                        "Pts Totales": "... ⬇️ ...",
+                        "1er Criterio": "... ⬇️ ...",
+                        "2do Criterio": "... ⬇️ ...",
                         "3er Criterio": pd.NaT, # Valor nulo para fechas
                         "cedula": "separador"
                     }])
