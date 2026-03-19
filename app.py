@@ -69,18 +69,17 @@ st.markdown(f"""
         padding-bottom: 0.5rem !important;
     }}
 
-
-/* --- HACER VISIBLE EL BOTÓN DE MENÚ EN CELULARES --- */
-    header[data-testid="stHeader"] button {
+    /* --- HACER VISIBLE EL BOTÓN DE MENÚ EN CELULARES --- */
+    header[data-testid="stHeader"] button {{
         background-color: rgba(30, 41, 59, 0.8) !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
         border-radius: 8px !important;
         margin: 5px !important;
-    }
-    header[data-testid="stHeader"] svg {
+    }}
+    header[data-testid="stHeader"] svg {{
         fill: #ffffff !important;
         stroke: #ffffff !important;
-    }
+    }}
 
     /* --- MENÚ LATERAL (SIDEBAR) 70% TRANSPARENTE --- */
     [data-testid="stSidebar"] {{
@@ -474,7 +473,7 @@ elif st.session_state.paso == 'apostador':
         else:
             ranking_list = []
             for cedula_u in df_ap['cedula'].astype(str).str.strip().unique():
-                if cedula_u == "": continue # Evitamos celdas vacías
+                if cedula_u == "": continue
                 user_ap = df_ap[df_ap['cedula'].astype(str).str.strip() == cedula_u].copy()
                 user_ap['timestamp'] = pd.to_datetime(user_ap['timestamp'], errors='coerce')
                 user_ap = user_ap.sort_values('timestamp', ascending=False).drop_duplicates(subset=['id_partido'])
@@ -512,7 +511,6 @@ elif st.session_state.paso == 'apostador':
                     "cedula": cedula_u
                 })
 
-            # --- LA SOLUCIÓN: Validamos que haya datos antes de armar la tabla ---
             if len(ranking_list) == 0:
                 st.info("Aún no hay pronósticos guardados por ningún usuario para calcular el ranking.")
             else:
@@ -538,10 +536,10 @@ elif st.session_state.paso == 'apostador':
                     if not user_row.empty:
                         dummy_row = pd.DataFrame([{
                             "Pos": None,
-                            "Empleado": "⬇️ ... ⬇️",
-                            "Pts Totales": None,
-                            "1er Criterio": None,
-                            "2do Criterio": None,
+                            "Empleado": "... ⬇️ ...",
+                            "Pts Totales": "...",
+                            "1er Criterio": "...",
+                            "2do Criterio": "...",
                             "3er Criterio": pd.NaT, 
                             "cedula": "separador"
                         }])
