@@ -461,6 +461,7 @@ elif st.session_state.paso == 'apostador':
         else:
             ranking_list = []
             for cedula_u in df_ap['cedula'].astype(str).str.strip().unique():
+                if cedula_u == "": continue # Evitamos celdas vacías
                 user_ap = df_ap[df_ap['cedula'].astype(str).str.strip() == cedula_u].copy()
                 user_ap['timestamp'] = pd.to_datetime(user_ap['timestamp'], errors='coerce')
                 user_ap = user_ap.sort_values('timestamp', ascending=False).drop_duplicates(subset=['id_partido'])
@@ -498,67 +499,71 @@ elif st.session_state.paso == 'apostador':
                     "cedula": cedula_u
                 })
 
-            df_rank_base = pd.DataFrame(ranking_list).sort_values(
-                by=["Pts Totales", "1er Criterio", "2do Criterio", "3er Criterio"],
-                ascending=[False, False, False, True]
-            )
+            # --- LA SOLUCIÓN: Validamos que haya datos antes de armar la tabla ---
+            if len(ranking_list) == 0:
+                st.info("Aún no hay pronósticos guardados por ningún usuario para calcular el ranking.")
+            else:
+                df_rank_base = pd.DataFrame(ranking_list).sort_values(
+                    by=["Pts Totales", "1er Criterio", "2do Criterio", "3er Criterio"],
+                    ascending=[False, False, False, True]
+                )
 
-            df_rank_base.reset_index(drop=True, inplace=True)
-            df_rank_base.insert(0, "Pos", range(1, len(df_rank_base)+1))
+                df_rank_base.reset_index(drop=True, inplace=True)
+                df_rank_base.insert(0, "Pos", range(1, len(df_rank_base)+1))
 
-            config = df_c.iloc[0]
-            limite_r = 15
-            if not config.empty and 'limite_ranking' in df_c.columns:
-                val = str(config['limite_ranking']).strip()
-                if val != "" and val != "nan": limite_r = int(float(val))
+                config = df_c.iloc[0]
+                limite_r = 15
+                if not config.empty and 'limite_ranking' in df_c.columns:
+                    val = str(config['limite_ranking']).strip()
+                    if val != "" and val != "nan": limite_r = int(float(val))
 
-            df_mostrar = df_rank_base.head(limite_r).copy()
-            ced_activa = str(user['cedula']).strip()
+                df_mostrar = df_rank_base.head(limite_r).copy()
+                ced_activa = str(user['cedula']).strip()
 
-            if ced_activa not in df_mostrar['cedula'].astype(str).values:
-                user_row = df_rank_base[df_rank_base['cedula'].astype(str) == ced_activa]
-                if not user_row.empty:
-                    dummy_row = pd.DataFrame([{
-                        "Pos": None,
-                        "Empleado": "... ⬇️ ...",
-                        "Pts Totales": "... ⬇️ ...",
-                        "1er Criterio": "...",
-                        "2do Criterio": "...",
-                        "3er Criterio": "...",
- 			"cedula": "separador"
-                    }])
-                    df_mostrar = pd.concat([df_mostrar, dummy_row, user_row], ignore_index=True)
+                if ced_activa not in df_mostrar['cedula'].astype(str).values:
+                    user_row = df_rank_base[df_rank_base['cedula'].astype(str) == ced_activa]
+                    if not user_row.empty:
+                        dummy_row = pd.DataFrame([{
+                            "Pos": None,
+                            "Empleado": "⬇️ ... ⬇️",
+                            "Pts Totales": None,
+                            "1er Criterio": None,
+                            "2do Criterio": None,
+                            "3er Criterio": pd.NaT, 
+                            "cedula": "separador"
+                        }])
+                        df_mostrar = pd.concat([df_mostrar, dummy_row, user_row], ignore_index=True)
 
-            df_para_mostrar = df_mostrar.rename(columns={
-                "Pos": "𝐏𝐎𝐒",
-                "Empleado": "𝐄𝐌𝐏𝐋𝐄𝐀𝐃𝐎",
-                "Pts Totales": "𝐏𝐓𝐒 𝐓𝐎𝐓𝐀𝐋𝐄𝐒",
-                "1er Criterio": "𝟏𝐄𝐑 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐄𝐗𝐀𝐂𝐓𝐎𝐒",
-                "2do Criterio": "𝟐𝐃𝐎 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐓𝐄𝐍𝐃𝐄𝐍𝐂𝐈𝐀",
-                "3er Criterio": "Ú𝐋𝐓. 𝐀𝐏𝐔𝐄𝐒𝐓𝐀",
-                "cedula": "cedula"
-            })
+                df_para_mostrar = df_mostrar.rename(columns={
+                    "Pos": "𝐏𝐎𝐒",
+                    "Empleado": "𝐄𝐌𝐏𝐋𝐄𝐀𝐃𝐎",
+                    "Pts Totales": "𝐏𝐓𝐒 𝐓𝐎𝐓𝐀𝐋𝐄𝐒",
+                    "1er Criterio": "𝟏𝐄𝐑 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐄𝐗𝐀𝐂𝐓𝐎𝐒",
+                    "2do Criterio": "𝟐𝐃𝐎 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐓𝐄𝐍𝐃𝐄𝐍𝐂𝐈𝐀",
+                    "3er Criterio": "Ú𝐋𝐓. 𝐀𝐏𝐔𝐄𝐒𝐓𝐀",
+                    "cedula": "cedula"
+                })
 
-            indices_usuario = df_para_mostrar.index[df_para_mostrar['cedula'].astype(str) == ced_activa].tolist()
-            df_publico = df_para_mostrar.drop(columns=['cedula'])
+                indices_usuario = df_para_mostrar.index[df_para_mostrar['cedula'].astype(str) == ced_activa].tolist()
+                df_publico = df_para_mostrar.drop(columns=['cedula'])
 
-            def estilo_usuario_seguro(x):
-                df_estilos = pd.DataFrame('text-align: center', index=x.index, columns=x.columns)
-                for idx in indices_usuario:
-                    if idx in df_estilos.index:
-                        df_estilos.loc[idx, :] = 'background-color: #198754; color: white; text-align: center'
-                return df_estilos
+                def estilo_usuario_seguro(x):
+                    df_estilos = pd.DataFrame('text-align: center', index=x.index, columns=x.columns)
+                    for idx in indices_usuario:
+                        if idx in df_estilos.index:
+                            df_estilos.loc[idx, :] = 'background-color: #198754; color: white; text-align: center'
+                    return df_estilos
 
-            st.dataframe(
-                df_publico.style.apply(estilo_usuario_seguro, axis=None),
-                hide_index=True,
-                use_container_width=True,
-                column_config={
-                    "𝟏𝐄𝐑 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐄𝐗𝐀𝐂𝐓𝐎𝐒": st.column_config.NumberColumn(help="Marcadores exactos acertados (+5 Pts)"),
-                    "𝟐𝐃𝐎 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐓𝐄𝐍𝐃𝐄𝐍𝐂𝐈𝐀": st.column_config.NumberColumn(help="Tendencias de ganador acertadas (+3 Pts)"),
-                    "Ú𝐋𝐓. 𝐀𝐏𝐔𝐄𝐒𝐓𝐀": st.column_config.DatetimeColumn(help="Fecha y hora de desempate", format="DD/MM/YYYY HH:mm:ss")
-                }
-            )
+                st.dataframe(
+                    df_publico.style.apply(estilo_usuario_seguro, axis=None),
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "𝟏𝐄𝐑 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐄𝐗𝐀𝐂𝐓𝐎𝐒": st.column_config.NumberColumn(help="Marcadores exactos acertados (+5 Pts)"),
+                        "𝟐𝐃𝐎 𝐂𝐑𝐈𝐓𝐄𝐑𝐈𝐎: 𝐓𝐄𝐍𝐃𝐄𝐍𝐂𝐈𝐀": st.column_config.NumberColumn(help="Tendencias de ganador acertadas (+3 Pts)"),
+                        "Ú𝐋𝐓. 𝐀𝐏𝐔𝐄𝐒𝐓𝐀": st.column_config.DatetimeColumn(help="Fecha y hora de desempate", format="DD/MM/YYYY HH:mm:ss")
+                    }
+                )
 
     # --- PESTAÑA 4: AYUDA ---
     with tab4:
