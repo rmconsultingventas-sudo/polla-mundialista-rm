@@ -42,7 +42,6 @@ def obtener_base64_imagen(nombre_archivo):
 img_base64 = obtener_base64_imagen("fondo.jpeg")
 
 # --- DISEÑO FUTBOLERO Y FONDO DE PANTALLA (CSS) ---
-# Nota: Dobles llaves {{}} para evitar SyntaxError en f-strings
 st.markdown(f"""
     <style>
     /* 1. Imagen de fondo global */
@@ -62,11 +61,12 @@ st.markdown(f"""
         background-color: transparent !important;
     }}
     .block-container {{
-        padding-top: 1.5rem !important; 
+        padding-top: 1rem !important; 
         padding-bottom: 2rem !important;
     }}
     h1 {{
-        margin-top: 0 !important;
+        margin-top: -1.5rem !important;
+        padding-bottom: 0.5rem !important;
     }}
 
     /* --- MENÚ LATERAL (SIDEBAR) 70% TRANSPARENTE --- */
@@ -230,27 +230,29 @@ elif st.session_state.paso == 'apostador':
 
     nombres_rondas_display = " + ".join(rondas_activas) if len(rondas_activas) <= 2 else f"Múltiples Fases ({len(rondas_activas)})"
 
-    # --- RELOJ EN TIEMPO REAL (JAVASCRIPT) ---
-    col_timer, col_deadline = st.columns([1.5, 1])
+    # --- MAQUETACIÓN DENSA: RELOJ, FECHA E INSTRUCTIVO ---
+    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True) 
+    col_timer, col_deadline, col_inst = st.columns([1.2, 1.2, 2])
 
     with col_timer:
         if f_apertura <= ahora <= f_cierre:
             cierre_iso = f_cierre.strftime("%Y-%m-%dT%H:%M:%S")
             reloj_html = f"""
             <style>
-                body {{ margin: 0; padding: 0; font-family: sans-serif; background-color: transparent; }}
+                body {{ margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; background-color: transparent; }}
                 .timer-box {{
-                    background-color: rgba(255, 193, 7, 0.15);
+                    background-color: rgba(15, 23, 42, 0.7);
                     color: #ffc107;
-                    padding: 8px 12px;
+                    padding: 8px 10px;
                     border-radius: 8px;
-                    border: 1px solid rgba(255, 193, 7, 0.5);
+                    border: 1px solid rgba(255, 193, 7, 0.4);
                     font-size: 15px;
                     font-weight: bold;
-                    display: inline-block;
+                    text-align: center;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
                 }}
             </style>
-            <div class="timer-box" id="clock">⏳ Calculando tiempo...</div>
+            <div class="timer-box" id="clock">⏳ Calculando...</div>
             <script>
                 var countDownDate = new Date("{cierre_iso}").getTime();
                 var x = setInterval(function() {{
@@ -258,16 +260,14 @@ elif st.session_state.paso == 'apostador':
                     var distance = countDownDate - now;
                     if (distance < 0) {{
                         clearInterval(x);
-                        document.getElementById("clock").innerHTML = "🔒 APUESTAS CERRADAS";
+                        document.getElementById("clock").innerHTML = "🔒 CERRADO";
                     }} else {{
-                        var days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                        var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                        var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                        var seconds = Math.floor((distance % (1000 * 60)) / 1000);
-                        hours = (hours < 10) ? "0" + hours : hours;
-                        minutes = (minutes < 10) ? "0" + minutes : minutes;
-                        seconds = (seconds < 10) ? "0" + seconds : seconds;
-                        document.getElementById("clock").innerHTML = "⏳ Faltan " + days + "d " + hours + ":" + minutes + ":" + seconds;
+                        var d = Math.floor(distance / (1000 * 60 * 60 * 24));
+                        var h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        var m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        var s = Math.floor((distance % (1000 * 60)) / 1000);
+                        h = (h < 10) ? "0" + h : h; m = (m < 10) ? "0" + m : m; s = (s < 10) ? "0" + s : s;
+                        document.getElementById("clock").innerHTML = "⏳ " + d + "d " + h + ":" + m + ":" + s;
                     }}
                 }}, 1000);
             </script>
@@ -276,17 +276,17 @@ elif st.session_state.paso == 'apostador':
             
     with col_deadline:
         if f_apertura <= ahora <= f_cierre:
-            st.caption(f"Fecha límite: {f_cierre.strftime('%d/%m/%Y %H:%M')}")
+            st.markdown(f"""
+                <div style="background-color: rgba(15, 23, 42, 0.7); color: #e2e8f0; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.2); font-size: 14px; text-align: center; font-family: sans-serif; box-shadow: 0 4px 6px rgba(0,0,0,0.3); height: 38px; display: flex; align-items: center; justify-content: center;">
+                    🕒 Límite: {f_cierre.strftime('%d/%m/%y %H:%M')}
+                </div>
+            """, unsafe_allow_html=True)
 
-    # --- INSTRUCTIVO DE NAVEGACIÓN ---
-    with st.expander("📖 ¿Cómo funciona la plataforma? ¡Lee este breve instructivo!"):
-        st.markdown("""
-        Bienvenido a la Polla Mundialista. Navega usando las pestañas de abajo:
-        * **📝 Mis Pronósticos:** Aquí verás los partidos activos. Ingresa los goles, marca la casilla de confirmación al final y presiona "Guardar". ¡Puedes modificar tus resultados antes de la fecha de cierre!
-        * **🥇 Mi Podio:** Elige qué países quedarán como Campeón, Subcampeón y Tercer lugar.
-        * **📊 Ranking:** Revisa tu posición en tiempo real frente a los demás participantes.
-        * **❓ Ayuda:** Consulta el reglamento oficial del juego y el manual de usuario detallado.
-        """)
+    with col_inst:
+        with st.expander("📖 ¿Cómo funciona? Instructivo rápido"):
+            st.markdown("📝 **Pronósticos:** Ingresa goles y guarda.\n🥇 **Podio:** Elige Campeón, Sub y Tercero.\n📊 **Ranking:** Tu posición en tiempo real.")
+    
+    st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Mis Pronósticos", "🥇 Mi Podio", "📊 Ranking", "❓ Ayuda"])
 
@@ -524,8 +524,8 @@ elif st.session_state.paso == 'apostador':
                         "Pts Totales": "... ⬇️ ...",
                         "1er Criterio": "...",
                         "2do Criterio": "...",
-                        "3er Criterio": "...", 
-                        "cedula": "separador"
+                        "3er Criterio": "...",
+ 			"cedula": "separador"
                     }])
                     df_mostrar = pd.concat([df_mostrar, dummy_row, user_row], ignore_index=True)
 
