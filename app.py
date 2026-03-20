@@ -160,10 +160,11 @@ def parse_fecha(fecha_str):
 
 def obtener_bandera(equipo, df_banderas, es_local=True):
     equipo_limpio = str(equipo).strip().lower()
-    if not df_banderas.empty and 'equipo' in df_banderas.columns and 'url' in df_banderas.columns:
+    if not df_banderas.empty and 'equipo' in df_banderas.columns:
         match = df_banderas[df_banderas['equipo'].astype(str).str.strip().str.lower() == equipo_limpio]
         if not match.empty:
-            return match.iloc[0]['url']
+            if 'bandera' in match.columns: return match.iloc[0]['bandera']
+            if 'url' in match.columns: return match.iloc[0]['url']
     if "ganador" in equipo_limpio or "play-off" in equipo_limpio or "1ro" in equipo_limpio or "2do" in equipo_limpio:
         return "🟦" if es_local else "🟥"
     return "🏳️"
@@ -379,7 +380,10 @@ elif st.session_state.paso == 'apostador':
                     
                     # --- EXTRAER Y RECORTAR FECHA PARA EL CENTRO ---
                     fecha_str = str(p.get('fecha', '')).strip()
-                    fecha_corta = fecha_str[:5] + " " + fecha_str[-5:] if len(fecha_str) >= 15 else fecha_str
+                    if fecha_str != "" and fecha_str.lower() != "nan":
+                        fecha_corta = fecha_str[:5] + " " + fecha_str[-5:] if len(fecha_str) >= 15 else fecha_str
+                    else:
+                        fecha_corta = "Por definir"
 
                     c1, c2, c3, c_vs, c4, c5, c6 = st.columns([1.5, 2, 0.9, 0.7, 0.9, 2, 1.5], vertical_alignment="center")
                     c1.caption(f"#{pid} {contexto_txt}")
@@ -398,8 +402,8 @@ elif st.session_state.paso == 'apostador':
                     # --- INYECCIÓN HTML PARA EL "VS" CENTRAL ---
                     c_vs.markdown(f"""
                         <div style="text-align: center; line-height: 1.1; margin-top: 5px;">
-                            <strong style="font-size: 14px;">VS</strong><br>
-                            <span style="font-size: 10px; color: gray;">{fecha_corta}</span>
+                            <strong style="font-size: 14px; color: white;">VS</strong><br>
+                            <span style="font-size: 10px; color: #a0aec0;">{fecha_corta}</span>
                         </div>
                     """, unsafe_allow_html=True)
 
@@ -477,10 +481,18 @@ elif st.session_state.paso == 'apostador':
                 f_podio['timestamp'] = pd.to_datetime(f_podio['timestamp'], errors='coerce')
                 f_podio = f_podio.sort_values('timestamp', ascending=False)
                 
-                equipo_guardado = f_podio.iloc[0]['equipo_a_pred']
-                fecha_guardada = f_podio.iloc[0]['timestamp'].strftime('%d/%m/%Y %H:%M') if pd.notna(f_podio.iloc[0]['timestamp']) else ""
+                equipo_guardado = str(f_podio.iloc[0]['equipo_a_pred']).strip()
+                fecha_guardada = str(f_podio.iloc[0]['timestamp']).strip()
 
-                # Aquí aplicamos la etiqueta dinámica de estado
+                # SANADOR: Invertir variables si la base de datos las guardó al revés
+                if "2026" in equipo_guardado or "-" in equipo_guardado:
+                    temp = equipo_guardado
+                    equipo_guardado = fecha_guardada
+                    fecha_guardada = temp
+                
+                if len(fecha_guardada) > 16:
+                    fecha_guardada = fecha_guardada[:16]
+
                 st.markdown(f"#### {lab}")
                 st.markdown(f"**{equipo_guardado}**")
                 st.markdown(f"{obtener_etiqueta_estado(equipo_guardado)} <span style='color:gray; font-size:11px; margin-left: 10px;'>(Guardado: {fecha_guardada})</span>", unsafe_allow_html=True)
