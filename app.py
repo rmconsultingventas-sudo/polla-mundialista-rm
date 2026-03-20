@@ -163,6 +163,7 @@ def obtener_bandera(equipo, df_banderas, es_local=True):
     if not df_banderas.empty and 'equipo' in df_banderas.columns:
         match = df_banderas[df_banderas['equipo'].astype(str).str.strip().str.lower() == equipo_limpio]
         if not match.empty:
+            # Blindaje: buscamos bandera o url
             if 'bandera' in match.columns: return match.iloc[0]['bandera']
             if 'url' in match.columns: return match.iloc[0]['url']
     if "ganador" in equipo_limpio or "play-off" in equipo_limpio or "1ro" in equipo_limpio or "2do" in equipo_limpio:
@@ -343,7 +344,7 @@ elif st.session_state.paso == 'apostador':
                 c1.markdown("**Partido/Grupo**")
                 c2.markdown("**Equipo Local**")
                 c3.markdown("**Goles L**")
-                c_vs.markdown("") # Columna vacía de separador
+                c_vs.markdown("") 
                 c4.markdown("**Goles V**")
                 c5.markdown("**Equipo Visitante**")
                 c6.markdown("**Estado / Puntos**")
@@ -378,10 +379,13 @@ elif st.session_state.paso == 'apostador':
                     grupo_letra = str(p.get('grupo', '?')).strip()
                     contexto_txt = f"(Grupo {grupo_letra})" if "grupos" in fase_txt.lower() and grupo_letra != "" else f"({fase_txt})"
                     
-                    # --- EXTRAER Y RECORTAR FECHA PARA EL CENTRO ---
-                    fecha_str = str(p.get('fecha', '')).strip()
+                    # --- EXTRAER Y RECORTAR FECHA (usando fecha_hora) ---
+                    fecha_str = str(p.get('fecha_hora', '')).strip()
                     if fecha_str != "" and fecha_str.lower() != "nan":
-                        fecha_corta = fecha_str[:5] + " " + fecha_str[-5:] if len(fecha_str) >= 15 else fecha_str
+                        if len(fecha_str) >= 15:
+                            fecha_corta = fecha_str[:5] + " " + fecha_str[-5:]
+                        else:
+                            fecha_corta = fecha_str
                     else:
                         fecha_corta = "Por definir"
 
@@ -434,15 +438,17 @@ elif st.session_state.paso == 'apostador':
                         lote_apuestas = []
                         
                         for id_p, datos in respuestas.items():
+                            # ESTRUCTURA EXACTA PARA GOOGLE SHEETS (9 COLUMNAS)
                             lote_apuestas.append({
                                 "id_apuesta": f"AP-{id_p}-{random.randint(100,999)}",
                                 "cedula": str(user['cedula']), 
                                 "id_partido": id_p, 
                                 "goles_a_pred": datos[2], 
                                 "goles_b_pred": datos[3],
+                                "puntos_ganados": "",
+                                "timestamp": ts,
                                 "equipo_a_pred": datos[0], 
-                                "equipo_b_pred": datos[1], 
-                                "timestamp": ts
+                                "equipo_b_pred": datos[1]
                             })
                         
                         barra_carga.progress(70)
@@ -463,7 +469,7 @@ elif st.session_state.paso == 'apostador':
                             except Exception as e:
                                 texto_estado.error("Hubo un error de conexión a internet. Intenta nuevamente.")
 
-    # --- PESTAÑA 2: MI PODIO (NUEVA VISUALIZACIÓN) ---
+    # --- PESTAÑA 2: MI PODIO ---
     with tab2:
         st.subheader("Define tu Podio Final")
         df_ap = all_data['apuestas'].copy()
@@ -481,14 +487,9 @@ elif st.session_state.paso == 'apostador':
                 f_podio['timestamp'] = pd.to_datetime(f_podio['timestamp'], errors='coerce')
                 f_podio = f_podio.sort_values('timestamp', ascending=False)
                 
+                # LECTURA LIMPIA DEL EQUIPO
                 equipo_guardado = str(f_podio.iloc[0]['equipo_a_pred']).strip()
                 fecha_guardada = str(f_podio.iloc[0]['timestamp']).strip()
-
-                # SANADOR: Invertir variables si la base de datos las guardó al revés
-                if "2026" in equipo_guardado or "-" in equipo_guardado:
-                    temp = equipo_guardado
-                    equipo_guardado = fecha_guardada
-                    fecha_guardada = temp
                 
                 if len(fecha_guardada) > 16:
                     fecha_guardada = fecha_guardada[:16]
@@ -502,7 +503,18 @@ elif st.session_state.paso == 'apostador':
                     c1, c2 = st.columns([3, 1])
                     sel_p = c1.selectbox(f"Elige {lab}", paises_validos, key=f"p{pid}")
                     if c2.button(f"Fijar {lab}", key=f"bp{pid}"):
-                        pay = {"id_apuesta": f"POD-{pid}", "cedula": str(user['cedula']), "id_partido": pid, "goles_a_pred": 0, "goles_b_pred": 0, "equipo_a_pred": sel_p, "equipo_b_pred": "N/A", "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                        # ESTRUCTURA EXACTA PARA EL PODIO (9 COLUMNAS)
+                        pay = {
+                            "id_apuesta": f"POD-{pid}", 
+                            "cedula": str(user['cedula']), 
+                            "id_partido": pid, 
+                            "goles_a_pred": 0, 
+                            "goles_b_pred": 0, 
+                            "puntos_ganados": "",
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "equipo_a_pred": sel_p, 
+                            "equipo_b_pred": "N/A"
+                        }
                         if requests.post(URL_APPS_SCRIPT, json=pay).text == "Success":
                             st.cache_data.clear(); st.rerun()
                 else: st.warning("Selección de podio deshabilitada por límite de tiempo.")
