@@ -160,10 +160,10 @@ def parse_fecha(fecha_str):
 
 def obtener_bandera(equipo, df_banderas, es_local=True):
     equipo_limpio = str(equipo).strip().lower()
-    if not df_banderas.empty and 'equipo' in df_banderas.columns and 'bandera' in df_banderas.columns:
+    if not df_banderas.empty and 'equipo' in df_banderas.columns and 'url' in df_banderas.columns:
         match = df_banderas[df_banderas['equipo'].astype(str).str.strip().str.lower() == equipo_limpio]
         if not match.empty:
-            return match.iloc[0]['bandera']
+            return match.iloc[0]['url']
     if "ganador" in equipo_limpio or "play-off" in equipo_limpio or "1ro" in equipo_limpio or "2do" in equipo_limpio:
         return "🟦" if es_local else "🟥"
     return "🏳️"
@@ -219,6 +219,20 @@ elif st.session_state.paso == 'apostador':
     user = st.session_state.datos_usuario
     st.sidebar.success(f"Sesión activa: {user.get('nombre', 'Usuario')}")
     
+    # --- LOGICA DE ESTADOS (Para el podio) ---
+    df_banderas = all_data['banderas']
+    estados_dict = {}
+    if not df_banderas.empty and 'equipo' in df_banderas.columns and 'estado' in df_banderas.columns:
+        estados_dict = dict(zip(df_banderas['equipo'].astype(str).str.strip().str.lower(), df_banderas['estado'].astype(str).str.strip().str.lower()))
+
+    def obtener_etiqueta_estado(equipo):
+        if not equipo or pd.isna(equipo) or str(equipo).strip() == "": return ""
+        estado = str(estados_dict.get(str(equipo).strip().lower(), "activo"))
+        if estado == "activo":
+             return '<span style="font-size: 13px; font-weight: bold; color: #09ab3b; background-color: #e6ffec; padding: 2px 6px; border-radius: 4px;">✅ Oportunidad activa</span>'
+        else:
+             return '<span style="font-size: 13px; font-weight: bold; color: #ff4b4b; background-color: #ffe6e6; padding: 2px 6px; border-radius: 4px;">🚫 Pronóstico nulo, equipo fuera del torneo</span>'
+
     ahora = datetime.now()
     
     rondas_activas = []
@@ -323,10 +337,12 @@ elif st.session_state.paso == 'apostador':
                 mis_apuestas['timestamp'] = pd.to_datetime(mis_apuestas['timestamp'], errors='coerce')
                 mis_apuestas = mis_apuestas.sort_values('timestamp', ascending=False)
                 
-                c1, c2, c3, c4, c5, c6 = st.columns([1.5, 2, 1, 1, 2, 1.5])
-                c1.markdown("**Partido / Grupo**")
+                # --- NUEVA ESTRUCTURA DE 7 COLUMNAS PARA ACOMODAR EL "VS" ---
+                c1, c2, c3, c_vs, c4, c5, c6 = st.columns([1.5, 2, 0.9, 0.7, 0.9, 2, 1.5])
+                c1.markdown("**Partido/Grupo**")
                 c2.markdown("**Equipo Local**")
                 c3.markdown("**Goles L**")
+                c_vs.markdown("") # Columna vacía de separador
                 c4.markdown("**Goles V**")
                 c5.markdown("**Equipo Visitante**")
                 c6.markdown("**Estado / Puntos**")
@@ -361,7 +377,11 @@ elif st.session_state.paso == 'apostador':
                     grupo_letra = str(p.get('grupo', '?')).strip()
                     contexto_txt = f"(Grupo {grupo_letra})" if "grupos" in fase_txt.lower() and grupo_letra != "" else f"({fase_txt})"
                     
-                    c1, c2, c3, c4, c5, c6 = st.columns([1.5, 2, 1, 1, 2, 1.5], vertical_alignment="center")
+                    # --- EXTRAER Y RECORTAR FECHA PARA EL CENTRO ---
+                    fecha_str = str(p.get('fecha', '')).strip()
+                    fecha_corta = fecha_str[:5] + " " + fecha_str[-5:] if len(fecha_str) >= 15 else fecha_str
+
+                    c1, c2, c3, c_vs, c4, c5, c6 = st.columns([1.5, 2, 0.9, 0.7, 0.9, 2, 1.5], vertical_alignment="center")
                     c1.caption(f"#{pid} {contexto_txt}")
                     
                     eq_a = str(p.get('equipo_a', ''))
@@ -374,6 +394,15 @@ elif st.session_state.paso == 'apostador':
                     
                     disabled_input = partido_jugado
                     ga = c3.number_input("A", min_value=0, max_value=20, value=def_ga, key=f"ga_{pid}", label_visibility="collapsed", disabled=disabled_input)
+                    
+                    # --- INYECCIÓN HTML PARA EL "VS" CENTRAL ---
+                    c_vs.markdown(f"""
+                        <div style="text-align: center; line-height: 1.1; margin-top: 5px;">
+                            <strong style="font-size: 14px;">VS</strong><br>
+                            <span style="font-size: 10px; color: gray;">{fecha_corta}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+
                     gb = c4.number_input("B", min_value=0, max_value=20, value=def_gb, key=f"gb_{pid}", label_visibility="collapsed", disabled=disabled_input)
                     
                     c5.markdown(render_equipo_con_bandera(eq_b, bandera_b, False), unsafe_allow_html=True)
@@ -430,7 +459,7 @@ elif st.session_state.paso == 'apostador':
                             except Exception as e:
                                 texto_estado.error("Hubo un error de conexión a internet. Intenta nuevamente.")
 
-    # --- PESTAÑA 2: MI PODIO ---
+    # --- PESTAÑA 2: MI PODIO (NUEVA VISUALIZACIÓN) ---
     with tab2:
         st.subheader("Define tu Podio Final")
         df_ap = all_data['apuestas'].copy()
@@ -447,7 +476,15 @@ elif st.session_state.paso == 'apostador':
             if not f_podio.empty:
                 f_podio['timestamp'] = pd.to_datetime(f_podio['timestamp'], errors='coerce')
                 f_podio = f_podio.sort_values('timestamp', ascending=False)
-                st.success(f"{lab} guardado: **{f_podio.iloc[0]['equipo_a_pred']}**")
+                
+                equipo_guardado = f_podio.iloc[0]['equipo_a_pred']
+                fecha_guardada = f_podio.iloc[0]['timestamp'].strftime('%d/%m/%Y %H:%M') if pd.notna(f_podio.iloc[0]['timestamp']) else ""
+
+                # Aquí aplicamos la etiqueta dinámica de estado
+                st.markdown(f"#### {lab}")
+                st.markdown(f"**{equipo_guardado}**")
+                st.markdown(f"{obtener_etiqueta_estado(equipo_guardado)} <span style='color:gray; font-size:11px; margin-left: 10px;'>(Guardado: {fecha_guardada})</span>", unsafe_allow_html=True)
+                st.divider()
             else:
                 if f_apertura <= ahora <= f_cierre:
                     c1, c2 = st.columns([3, 1])
