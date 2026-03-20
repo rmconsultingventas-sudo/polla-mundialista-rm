@@ -9,6 +9,7 @@ import time
 import base64
 import os
 import streamlit.components.v1 as components
+import pytz # Importante: Agrega pytz a tu archivo requirements.txt
 
 # --- CONFIGURACIÓN DE GIDs Y CORREO ---
 SENDER_EMAIL = "rm.consulting.ventas@gmail.com"
@@ -26,6 +27,12 @@ GIDS = {
 }
 
 st.set_page_config(page_title="Polla Mundialista 2026 - RM", layout="wide")
+
+# --- FUNCIÓN HORA COLOMBIA CON BLINDAJE ---
+def obtener_hora_colombia():
+    tz = pytz.timezone('America/Bogota')
+    # Forzamos la comilla simple para que Google Sheets no auto-formatee el dato
+    return "'" + datetime.now(tz).strftime("%d/%m/%Y %H:%M:%S")
 
 # --- FUNCIÓN PARA CARGAR IMAGEN EN LA NUBE ---
 @st.cache_data
@@ -163,7 +170,6 @@ def obtener_bandera(equipo, df_banderas, es_local=True):
     if not df_banderas.empty and 'equipo' in df_banderas.columns:
         match = df_banderas[df_banderas['equipo'].astype(str).str.strip().str.lower() == equipo_limpio]
         if not match.empty:
-            # Blindaje: buscamos bandera o url
             if 'bandera' in match.columns: return match.iloc[0]['bandera']
             if 'url' in match.columns: return match.iloc[0]['url']
     if "ganador" in equipo_limpio or "play-off" in equipo_limpio or "1ro" in equipo_limpio or "2do" in equipo_limpio:
@@ -434,7 +440,7 @@ elif st.session_state.paso == 'apostador':
                         texto_estado.info("⏳ Empaquetando y enviando pronósticos... Por favor espera.")
                         barra_carga.progress(40)
                         
-                        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        ts = obtener_hora_colombia()
                         lote_apuestas = []
                         
                         for id_p, datos in respuestas.items():
@@ -489,7 +495,7 @@ elif st.session_state.paso == 'apostador':
                 
                 # LECTURA LIMPIA DEL EQUIPO
                 equipo_guardado = str(f_podio.iloc[0]['equipo_a_pred']).strip()
-                fecha_guardada = str(f_podio.iloc[0]['timestamp']).strip()
+                fecha_guardada = str(f_podio.iloc[0]['timestamp']).replace("'", "").strip() # Quitamos comilla visual
                 
                 if len(fecha_guardada) > 16:
                     fecha_guardada = fecha_guardada[:16]
@@ -503,18 +509,19 @@ elif st.session_state.paso == 'apostador':
                     c1, c2 = st.columns([3, 1])
                     sel_p = c1.selectbox(f"Elige {lab}", paises_validos, key=f"p{pid}")
                     if c2.button(f"Fijar {lab}", key=f"bp{pid}"):
+                        ts_podio = obtener_hora_colombia()
                         # ESTRUCTURA EXACTA PARA EL PODIO (9 COLUMNAS)
-                        pay = {
+                        pay = [{
                             "id_apuesta": f"POD-{pid}", 
                             "cedula": str(user['cedula']), 
                             "id_partido": pid, 
                             "goles_a_pred": 0, 
                             "goles_b_pred": 0, 
                             "puntos_ganados": "",
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "timestamp": ts_podio,
                             "equipo_a_pred": sel_p, 
                             "equipo_b_pred": "N/A"
-                        }
+                        }]
                         if requests.post(URL_APPS_SCRIPT, json=pay).text == "Success":
                             st.cache_data.clear(); st.rerun()
                 else: st.warning("Selección de podio deshabilitada por límite de tiempo.")
